@@ -34,9 +34,14 @@ class HunyuanClient:
             req = models.ChatCompletionsRequest()
             req.Model = "hunyuan-standard"
             full_messages = [{"Role": "system", "Content": system_prompt}]
+            
+            # 🔴 强制只保留 user 和 assistant，彻底删除 tool
             for msg in messages:
+                if msg["role"] not in ["user", "assistant"]:
+                    continue
                 role = "assistant" if msg["role"] == "assistant" else "user"
                 full_messages.append({"Role": role, "Content": msg["content"]})
+            
             req.Messages = full_messages
             req.Temperature = 0.7
             resp = self.client.ChatCompletions(req)
@@ -96,6 +101,7 @@ st.info(f"当前模式：**{st.session_state.mode}**")
 # 清空对话
 if st.button("🗑 清空对话"):
     st.session_state.messages = []
+    st.rerun()
 
 # 显示历史
 for msg in st.session_state.messages:
@@ -120,8 +126,14 @@ if prompt:
     with st.chat_message("assistant"):
         with st.spinner("AI思考中..."):
             try:
+                # 🔴 关键修复：过滤非法角色，只传合法消息
+                clean_history = [
+                    m for m in st.session_state.messages[:-1]
+                    if m["role"] in ["user", "assistant"]
+                ]
+                
                 res = st.session_state.hy_client.chat_with_history(
-                    st.session_state.messages[:-1], system_prompt
+                    clean_history, system_prompt
                 )
                 st.markdown(res)
                 st.session_state.messages.append({"role": "assistant", "content": res})
